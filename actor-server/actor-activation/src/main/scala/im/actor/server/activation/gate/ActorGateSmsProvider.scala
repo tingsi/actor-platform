@@ -17,6 +17,9 @@ import spray.httpx.unmarshalling._
 import scala.concurrent.Future
 import scala.reflect.ClassTag
 
+//// 发送短信的actor。
+//// DONE: 奇怪，需要看清楚跟telesign的provider的区别。
+//// Fixed: 此处使用了sms gateway，也就是不是直接调用telesign，而是调用官方的统一短信服务，由官方再转去telesign。这样子就由官方统一付费了。
 private[activation] final class ActorGateSmsProvider(implicit system: ActorSystem)
   extends ActivationProvider
   with JsonFormatters
@@ -30,6 +33,9 @@ private[activation] final class ActorGateSmsProvider(implicit system: ActorSyste
 
   val pipeline: HttpRequest ⇒ Future[HttpResponse] = addHeader("X-Auth-Token", config.authToken) ~> sendReceive
 
+  //// 调用http请求来发送验证码。
+  //// 使用marshal,unmarshal来封装json和解析json.
+  //// 成功后返回CodeHash，存入到数据库中。 txHash => CodeHash. 
   // it would be better to have trait SmsProvider with send method for SmsCode only. In this case we won't have require()
   override def send(txHash: String, code: Code): Future[CodeFailure Xor Unit] = {
     require(code.isInstanceOf[SmsCode], "ActorGateSmsProvider is only capable of processing sms codes")
@@ -55,6 +61,8 @@ private[activation] final class ActorGateSmsProvider(implicit system: ActorSyste
     } yield result
   }
 
+  //// 根据 txHash 找到数据库里之前保存的CodeHash，校验验证码。
+  //// 此处仍是调用http请求来验证, 为啥呢？ 短信API提供的校验接口？
   override def validate(txHash: String, code: String): Future[ValidationResponse] = {
     for {
       optCodeHash ← db.run(GateAuthCodeRepo.find(txHash))
@@ -71,6 +79,7 @@ private[activation] final class ActorGateSmsProvider(implicit system: ActorSyste
     } yield validationResponse
   }
 
+  //// 清除认证txHash。
   override def cleanup(txHash: String): Future[Unit] = db.run(GateAuthCodeRepo.delete(txHash)).map(_ ⇒ ())
 
   private def marshalToEntity[T: ClassTag](value: T)(implicit marshaller: Marshaller[T]): Future[HttpEntity] =

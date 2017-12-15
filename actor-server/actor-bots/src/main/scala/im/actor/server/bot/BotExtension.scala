@@ -26,9 +26,11 @@ import slick.dbio.DBIO
 import scala.concurrent.Future
 import scala.concurrent.forkjoin.ThreadLocalRandom
 
+////FIXED: 了解下扩展机制 ExtensionIdProvider.
+//// Extension 是Actor的扩充机制.scala akka 内置实现. 用于扩充Actor的功能. (Actor默认只有一个apply方法)
 object BotExtension extends ExtensionId[BotExtension] with ExtensionIdProvider {
-  private[bot] val tokensKV = "BotsTokens"
-  private[bot] val whTokensKV = "BotsWHTokens"
+  private[bot] val tokensKV = "BotsTokens" ////bot token
+  private[bot] val whTokensKV = "BotsWHTokens" ////webhook token
 
   private[bot] def whUserTokensKV(userId: Int) = s"BotsWHUserTokens-$userId"
 
@@ -37,6 +39,7 @@ object BotExtension extends ExtensionId[BotExtension] with ExtensionIdProvider {
   override def lookup() = BotExtension
 }
 
+////Fixed: 重点了解下扩展模块机制。 BotExtension, DbExtension, UserExtension, ShardakkaExtension, ......
 private[bot] final class BotExtension(_system: ActorSystem) extends Extension {
 
   import _system._
@@ -61,10 +64,12 @@ private[bot] final class BotExtension(_system: ActorSystem) extends Extension {
 
   lazy val botServerBlueprint = new BotServerBlueprint(system)
 
+  //// 注： HttpApi 里面注册了bots的路由。 但是RPC里并没有。 是何用意得继续观察下。
   HttpApi(system).registerRoute("bots") { implicit system ⇒
     new BotsHttpHandler(this).routes
   }
 
+  //// 创建用户, 和普通用户一样，除了是bot类型的。调用UserExt处理数据库。
   /**
    * Creates a bot user
    *
@@ -164,6 +169,8 @@ private[bot] final class BotExtension(_system: ActorSystem) extends Extension {
   def webHookExists(userId: UserId, name: String): Future[Boolean] =
     hooksKV(userId).get(name).map(_.nonEmpty)
 
+  //// 每个webhook用BotWebHook封装。
+  //// 注：每个bot (由userID确定)，可以对应任意多个webhook（由随机token标记）。
   /**
    * Register webhook
    *
@@ -172,13 +179,13 @@ private[bot] final class BotExtension(_system: ActorSystem) extends Extension {
    * @return
    */
   def registerWebHook(userId: UserId, name: String): Future[String] = {
-    val token = genToken()
+    val token = genToken() //// 随机生成
     globalHooksKV.get(token) flatMap {
-      case Some(_) ⇒ registerWebHook(userId, name)
+      case Some(_) ⇒ registerWebHook(userId, name) ////token重复，重新再来。
       case None ⇒
-        val hook = BotWebHook(userId, name)
+        val hook = BotWebHook(userId, name) ////token唯一，创建hook.
         for {
-          _ ← globalHooksKV.upsert(token, hook)
+          _ ← globalHooksKV.upsert(token, hook) ////保存。
           _ ← hooksKV(userId).upsert(name, token)
         } yield token
     }
@@ -192,6 +199,8 @@ private[bot] final class BotExtension(_system: ActorSystem) extends Extension {
   private def genToken(): String =
     DigestUtils.md5Hex(ThreadLocalRandom.current().nextLong().toString)
 
+  //// TODO: 此处带查明，照理说bot应该直接创建它的访问token或者authHash就行了。为啥还需要认证会话呢？
+  //// 认证会话不是登录时临时用的么？
   private def getOrCreateAuthSession(userId: Int): Future[AuthSession] = {
     db.run(AuthSessionRepo.findFirstByUserId(userId)) flatMap {
       case Some(session) ⇒ FastFuture.successful(session)
@@ -215,7 +224,7 @@ private[bot] final class BotExtension(_system: ActorSystem) extends Extension {
         } yield session
     }
   }
-
+  //// 同上。
   private def getOrCreateAuthId(userId: Int): DBIO[AuthId] = {
     AuthIdRepo.findFirstIdByUserId(userId) flatMap {
       case Some(authId) ⇒

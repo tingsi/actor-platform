@@ -9,6 +9,8 @@ import scodec.bits.BitVector
 
 import scala.language.{ implicitConversions, postfixOps }
 
+//// 这儿的bot会话conversion是支持多种消息类型的，文字，图片，文本，语音，动画等等。
+
 trait ApiToBotConversions {
 
   import im.actor.bots.BotMessages._
@@ -155,6 +157,7 @@ trait ApiToBotConversions {
   implicit def toContactRecords(apiContactRecords: Seq[ApiContactRecord]): Seq[ContactRecord] =
     apiContactRecords flatMap toContactRecord
 
+  //// apiUser 和 User 还不一样？
   implicit def toUser(apiUser: ApiUser): User =
     User(
       id = apiUser.id,

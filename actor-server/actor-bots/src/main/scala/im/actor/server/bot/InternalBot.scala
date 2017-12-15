@@ -18,6 +18,7 @@ private object InternalBot {
 
   final case class Initialized(authId: Long, authSid: Int)
 
+  ////NOTE: 此处支持集群？
   def start(props: Props)(implicit system: ActorSystem) =
     system.actorOf(ClusterSingletonManager.props(
       props,
@@ -26,6 +27,7 @@ private object InternalBot {
     ))
 }
 
+//// 创建bot的用户信息,session,token什么的。
 abstract class InternalBot(userId: Int, nickname: String, name: String, isAdmin: Boolean) extends BotBase {
 
   import InternalBot._
@@ -57,6 +59,7 @@ abstract class InternalBot(userId: Int, nickname: String, name: String, isAdmin:
       log.error(e, "Failed to initialize bot")
   }
 
+  //// 检查bot 的 userID， 没有就创建，有就直接返回。
   private def init() = {
     log.warning("Initiating bot {} {} {}", userId, nickname, name)
 
@@ -72,6 +75,7 @@ abstract class InternalBot(userId: Int, nickname: String, name: String, isAdmin:
       }
     }
 
+    //// 获得bot的session信息， authId, sid，用来初始化。
     (for {
       _ ← existence
       session ← botExt.getAuthSession(userId)

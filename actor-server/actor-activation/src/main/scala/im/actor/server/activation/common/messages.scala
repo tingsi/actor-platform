@@ -1,5 +1,7 @@
 package im.actor.server.activation.common
 
+//// 主要是为了各种不同的响应类型。
+
 trait CodeResponse
 
 sealed trait CodeFailure

@@ -6,6 +6,8 @@ import com.typesafe.config.{ Config, ConfigFactory }
 import scala.concurrent.duration._
 import scala.util.Try
 
+//// 验证码的配置信息
+//// 重复发送的间隔、 验证码失效时间、尝试次数。
 object ActivationConfig {
   def load(config: Config): Try[ActivationConfig] =
     for {

@@ -6,6 +6,10 @@ import im.actor.config.ActorConfig
 import scala.collection.JavaConversions._
 import scala.util.{ Failure, Success, Try }
 
+//// provider管理器。
+//// 默认维护四个类型的provider。
+//// 根据配置文件类配置和加载具体的provider.
+
 object ActivationProviders {
   val Sms = "sms"
   val Smtp = "smtp"
@@ -20,9 +24,13 @@ object ActivationProviders {
    * @return map from activation type to activation provider instance
    */
   def getProviders()(implicit system: ActorSystem): Map[String, ActivationProvider] = {
+
+    //// 读取配置信息。
     val providersConfig = ActorConfig.load().getConfig("services.activation.providers")
     val configMap = providersConfig.root.unwrapped.toMap
 
+    //// 略复杂，去除重复类型的配置，以后在分析。 
+    //// TODO:
     val reverseAcc = Map.empty[String, List[String]].withDefaultValue(List.empty[String])
     // this is made to avoid duplicate instantiation of same providers
     val reverseMap = (configMap foldLeft reverseAcc) {
@@ -44,6 +52,7 @@ object ActivationProviders {
     }
   }
 
+  //// 根据配置创建Provider实例。
   private def providerOf(fqcn: String, system: ActorSystem): Try[ActivationProvider] = {
     for {
       constructor ← Try(Class.forName(fqcn).asSubclass(classOf[ActivationProvider]).getConstructor(classOf[ActorSystem]))

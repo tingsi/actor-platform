@@ -18,6 +18,7 @@ final class BotServerBlueprint(system: ActorSystem) {
 
   import system.dispatcher
 
+  //// 好多的bot服务。
   private val msgService = new MessagingBotService(system)
   private val kvService = new KeyValueBotService(system)
   private val botsService = new BotsBotService(system)
@@ -29,6 +30,8 @@ final class BotServerBlueprint(system: ActorSystem) {
 
   private val log = Logging(system, getClass)
 
+  //// 建立一个消息流处理图，并调用对应的服务来处理不同类型的消息。
+  //// BotRequest 里就需要指定 服务:body。 
   def flow(botUserId: Int, botAuthId: Long, botAuthSid: Int): Flow[BotRequest, BotMessageOut, akka.NotUsed] = {
     val updBuilder = new BotUpdateBuilder(botUserId, botAuthId, system)
 
@@ -46,6 +49,8 @@ final class BotServerBlueprint(system: ActorSystem) {
       }
       .map(_.asInstanceOf[BotMessageOut])
 
+    //// 此处刘flow用到了图graph的概念？
+    //// 看来还需要了解下他的消息flow的机制。
     Flow.fromGraph(
       GraphDSL.create() { implicit b ⇒
         import akka.stream.scaladsl.GraphDSL.Implicits._
@@ -65,7 +70,7 @@ final class BotServerBlueprint(system: ActorSystem) {
           throw e
       }
   }
-
+  //// 按服务->能处理body的handler。最后handle body消息，返回 response
   private def handleRequest(botUserId: Int, botAuthId: Long, botAuthSid: Int)(id: Long, service: String, body: RequestBody): Future[BotResponse] = {
     val resultFuture =
       if (services.isDefinedAt(service)) {

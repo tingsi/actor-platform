@@ -18,6 +18,9 @@ import im.actor.server.persist.{ AuthCodeRepo, UserEmailRepo, UserPhoneRepo }
 
 import scala.concurrent.Future
 
+//// 内部验证码处理机制。
+//// 方式是直接从txHash里找到电话或者邮箱，然后根据电话或者邮箱找到userID，然后直接发验证码以私聊的形式发给该用户。
+//// 这种方式适合调试，也就是有一台已经登录的设备，用来接收消息。如果是新用户，或者没有多个设备，这个方法还是不管用。
 private[activation] final class InternalCodeProvider(system: ActorSystem)
   extends ActivationProvider
   with CommonAuthCodes
@@ -36,6 +39,7 @@ private[activation] final class InternalCodeProvider(system: ActorSystem)
       presence ← fromFutureOption("No presence found for user")(db.run(UserPresenceRepo.find(userId)))
       lastSeen ← fromOption("No last seen date for user presence")(presence.lastSeenAt)
       _ ← fromFuture(
+        //// 用户不在线，此方法失效，以空的形式返回成功---不报错的失败。
         if (wasOnlineRecently(lastSeen.getMillis))
           sendCode(userId, code.code)
         else FastFuture.successful(())

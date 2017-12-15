@@ -25,6 +25,7 @@ object ActivationStateActor {
 
 }
 
+//// 直接执行发送验证码的actor.
 private[activation] final class ActivationStateActor[Id, CodeType <: Code](repeatLimit: Duration, send: CodeType ⇒ Future[Unit], extractId: CodeType ⇒ Id) extends Actor with ActorLogging {
   implicit val system = context.system
   implicit val ec = context.dispatcher
@@ -47,6 +48,9 @@ private[activation] final class ActivationStateActor[Id, CodeType <: Code](repea
     case ForgetSentCode(codeId: Id @unchecked) ⇒ forgetSentCode(codeId)
   }
 
+  //// 发送前先记录验证码id，避免重复发送---频繁访问。
+  //// 发送成功则删除验证码id。
+  //// 本机制只限于本actor内，跟缓存机制不一样。 主要是为了避免快速重复发送短信。
   private def sendCode(code: CodeType): Future[CodeFailure Xor Unit] = {
     if (codeWasNotSent(code)) {
       log.debug(s"Sending $code")
